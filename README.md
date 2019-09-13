@@ -56,7 +56,7 @@ For the current example, example-app and other-app.
 
 ```json
 "application_list": [
-  "example-app other-app"
+  connectivity-manager
 ]
 ```
 
@@ -177,7 +177,7 @@ spec:
     spec:
       containers:
       - name: example
-        image: nalejstaging.azurecr.io/nalej/example-app:v0.0.1
+        image: connectivity-manager
         imagePullPolicy: Always
         securityContext:
           runAsUser: 2000
