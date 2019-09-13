@@ -27,6 +27,10 @@ spec:
       - name: connectivity-manager
         image: __NPH_REGISTRY/__NPH_REGISTRY_NAMESPACE/connectivity-manager:__NPH_VERSION
         imagePullPolicy: Always
+        args:
+          - "run"
+          - "--debug"
+          - "--port=8383"
         securityContext:
           runAsUser: 2000
       imagePullSecrets:

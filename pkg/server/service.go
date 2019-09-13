@@ -40,7 +40,7 @@ func(c *Service) Run() {
 		log.Fatal().Errs("failed to listen: %v", []error{err})
 	}
 
-	// Register reflection service on gRPC server.
+	// Register reflection service on gRPC server
 	if c.configuration.Debug {
 		reflection.Register(c.server)
 	}
