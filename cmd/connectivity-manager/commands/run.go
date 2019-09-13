@@ -17,6 +17,7 @@ var runCmd = &cobra.Command{
 	Long:  `Run connectivity-manager`,
 	Run: func(cmd *cobra.Command, args []string) {
 		SetupLogging()
+		RunConnectivityManager()
 	},
 }
 
@@ -40,6 +41,9 @@ func RunConnectivityManager() {
 	}
 
 	log.Info().Msg("Launching connectivity-manager!")
-	server, _ := server.NewService(&config)
+	server, err := server.NewService(&config)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error creating connectivity-manager")
+	}
 	server.Run()
 }
