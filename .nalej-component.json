@@ -1,7 +1,7 @@
 {
     "language": "golang",
     "application_list": [
-        "example-app other-app"
+        "connectivity-manager"
     ],
     "tools": [
         "azure",

@@ -1,5 +1,5 @@
 ###
-# Application example
+# connectivity-manager
 ###
 
 kind: Deployment
@@ -7,8 +7,8 @@ apiVersion: apps/v1
 metadata:
   labels:
     cluster: management
-    component: example
-  name: example
+    component: connectivity-manager
+  name: connectivity-manager
   namespace: __NPH_NAMESPACE
 spec:
   replicas: 1
@@ -16,17 +16,21 @@ spec:
   selector:
     matchLabels:
       cluster: management
-      component: example
+      component: connectivity-manager
   template:
     metadata:
       labels:
         cluster: management
-        component: example
+        component: connectivity-manager
     spec:
       containers:
-      - name: example
-        image: __NPH_REGISTRY/__NPH_REGISTRY_NAMESPACE/example-app:__NPH_VERSION
+      - name: connectivity-manager
+        image: __NPH_REGISTRY/__NPH_REGISTRY_NAMESPACE/connectivity-manager:__NPH_VERSION
         imagePullPolicy: Always
+        args:
+          - "run"
+          - "--debug"
+          - "--port=8383"
         securityContext:
           runAsUser: 2000
       imagePullSecrets:
