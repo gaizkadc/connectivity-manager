@@ -2,6 +2,18 @@
 
 
 [[projects]]
+  digest = "1:4202ab09395574fdc038cf334a5e3c6887fb41dfd281bbc6007becc115cb44b4"
+  name = "github.com/Comcast/pulsar-client-go"
+  packages = [
+    ".",
+    "api",
+    "frame",
+  ]
+  pruneopts = ""
+  revision = "d669484e60e7f709498a119f36ed060ed0c1eeed"
+  version = "v0.1.1"
+
+[[projects]]
   digest = "1:eb53021a8aa3f599d29c7102e65026242bdedce998a54837dc67f14b6a97c5fd"
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
@@ -251,6 +263,7 @@
   name = "github.com/nalej/nalej-bus"
   packages = [
     "pkg/bus",
+    "pkg/bus/pulsar-comcast",
     "pkg/queue",
     "pkg/queue/infrastructure/events",
   ]
@@ -448,9 +461,8 @@
   analyzer-version = 1
   input-imports = [
     "github.com/nalej/derrors",
-    "github.com/nalej/grpc-application-go",
     "github.com/nalej/grpc-connectivity-manager-go",
-    "github.com/nalej/grpc-organization-go",
+    "github.com/nalej/nalej-bus/pkg/bus/pulsar-comcast",
     "github.com/nalej/nalej-bus/pkg/queue/infrastructure/events",
     "github.com/rs/zerolog",
     "github.com/rs/zerolog/log",

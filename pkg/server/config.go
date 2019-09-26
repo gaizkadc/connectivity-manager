@@ -15,11 +15,16 @@ type Config struct {
 	Port uint32
 	// Debugging flag
 	Debug bool
+	// URL for the message queue
+	QueueAddress string
 }
 
 func (conf *Config) Validate() derrors.Error {
 	if conf.Port == 0 {
 		return derrors.NewInvalidArgumentError("port must be set")
+	}
+	if conf.QueueAddress == "" {
+		return derrors.NewInvalidArgumentError("queue address must be set")
 	}
 
 	return nil

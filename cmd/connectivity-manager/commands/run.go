@@ -22,22 +22,24 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().Uint32P("port", "p", 8383,"port where connectivity-manager listens to")
+	runCmd.Flags().Uint32("port", 8383,"port where connectivity-manager listens to")
+	runCmd.Flags().String("queueAddress", "", "address of the nalej bus")
 	rootCmd.AddCommand(runCmd)
 }
 
 func RunConnectivityManager() {
-	// Incoming requests port
 	var port uint32
-	// Debug flag
 	var debug bool
+	var queueAddress string
 
 	port = uint32(viper.GetInt32("port"))
 	debug = viper.GetBool("debug")
+	queueAddress = viper.GetString("queueAddress")
 
 	config := server.Config{
 		Port:  port,
 		Debug: debug,
+		QueueAddress: queueAddress,
 	}
 
 	log.Info().Msg("Launching connectivity-manager!")
