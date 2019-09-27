@@ -32,6 +32,8 @@ spec:
           - "--debug"
           - "--port=8383"
           - "--queueAddress=broker.__NPH_NAMESPACE:6650"
+          - "--gracePeriod=5m"
+          - "--threshold=1m"
         securityContext:
           runAsUser: 2000
       imagePullSecrets:

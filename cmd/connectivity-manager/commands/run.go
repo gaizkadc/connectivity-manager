@@ -8,8 +8,10 @@ import (
 	"github.com/nalej/connectivity-manager/pkg/server"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"time"
 )
+
+var config = server.Config{}
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -22,30 +24,20 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().Uint32("port", 8383,"port where connectivity-manager listens to")
-	runCmd.Flags().String("queueAddress", "", "address of the nalej bus")
+	runCmd.Flags().Uint32Var(&config.Port, "port", 8383, "port where connectivity-manager listens to")
+	runCmd.Flags().StringVar(&config.QueueAddress, "queueAddress", "","address of the nalej bus")
+	runCmd.Flags().DurationVar(&config.GracePeriod, "gracePeriod", 5*time.Minute, "grace period for a cluster to be considered OfflineCordon")
+	runCmd.Flags().DurationVar(&config.Threshold, "threshold", time.Minute, "threshold for a cluster to be considered Offline or Online")
+
 	rootCmd.AddCommand(runCmd)
 }
 
 func RunConnectivityManager() {
-	var port uint32
-	var debug bool
-	var queueAddress string
-
-	port = uint32(viper.GetInt32("port"))
-	debug = viper.GetBool("debug")
-	queueAddress = viper.GetString("queueAddress")
-
-	config := server.Config{
-		Port:  port,
-		Debug: debug,
-		QueueAddress: queueAddress,
-	}
-
 	log.Info().Msg("Launching connectivity-manager!")
 	server, err := server.NewService(&config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error creating connectivity-manager")
 	}
+	config.Print()
 	server.Run()
 }
