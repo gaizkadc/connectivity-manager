@@ -22,6 +22,13 @@ type InfrastructureEventsHandler struct {
 	consumer *events.InfrastructureEventsConsumer
 }
 
+type ClusterStatus struct {
+	Online bool
+	Offline bool
+	OnlineCordon bool
+	OfflineCordon bool
+}
+
 // Instantiate a new network ops handler to manipulate messages from the network ops queue.
 // params:
 //  netManager
