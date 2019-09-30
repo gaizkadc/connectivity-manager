@@ -34,7 +34,9 @@ type InfrastructureEventsHandler struct {
 //  cmManager
 //  cons
 func NewInfrastructureEventsHandler (connectivityManagerManager *connectivity_manager.Manager, consumer *events.InfrastructureEventsConsumer) InfrastructureEventsHandler {
-	return InfrastructureEventsHandler{connectivityManagerManager: connectivityManagerManager, consumer: consumer, clusterStatus:ClusterUnknown}
+	ieHandler := InfrastructureEventsHandler{connectivityManagerManager: connectivityManagerManager, consumer: consumer, clusterStatus:ClusterUnknown}
+	log.Debug().Str("cluster status", ieHandler.clusterStatus).Msg("new infrastructure events handler created")
+	return ieHandler
 }
 
 func(i InfrastructureEventsHandler) Run(threshold time.Duration) {
