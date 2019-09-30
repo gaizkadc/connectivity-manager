@@ -80,7 +80,7 @@ func(s *Service) Run() {
 		log.Fatal().Str("err", err.Error()).Msg("Cannot create connectivity-manager manager")
 	}
 	infraEventsHandler := queue.NewInfrastructureEventsHandler(connectivityManagerManager, busClients.InfrastructureEventsConsumer)
-	infraEventsHandler.Run()
+	infraEventsHandler.Run(s.configuration.Threshold)
 
 	// Register reflection service on gRPC server
 	if s.configuration.Debug {

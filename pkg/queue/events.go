@@ -12,42 +12,42 @@ import (
 	"time"
 )
 
-// Timeout between incoming messages
-const InfrastructureEventsTimeout = time.Minute * 60
+const (
+	ClusterOffline = "offline"
+	ClusterOnline = "online"
+	ClusterOfflineCordon = "offlineCordon"
+	ClusterOnlineCordon = "offline"
+	ClusterUnknown = "unknown"
+)
 
 type InfrastructureEventsHandler struct {
 	// reference manager for infrastructure
 	connectivityManagerManager *connectivity_manager.Manager
 	// events consumer
 	consumer *events.InfrastructureEventsConsumer
+	// Cluster status: online, offline, onlineCordon, offlineCordon, unknown
+	clusterStatus string
 }
 
-type ClusterStatus struct {
-	Online bool
-	Offline bool
-	OnlineCordon bool
-	OfflineCordon bool
-}
-
-// Instantiate a new network ops handler to manipulate messages from the network ops queue.
+// Instantiate a new infrastructure events handler to manipulate messages from the infrastructure events queue.
 // params:
-//  netManager
+//  cmManager
 //  cons
 func NewInfrastructureEventsHandler (connectivityManagerManager *connectivity_manager.Manager, consumer *events.InfrastructureEventsConsumer) InfrastructureEventsHandler {
-	return InfrastructureEventsHandler{connectivityManagerManager: connectivityManagerManager, consumer: consumer}
+	return InfrastructureEventsHandler{connectivityManagerManager: connectivityManagerManager, consumer: consumer, clusterStatus:ClusterUnknown}
 }
 
-func(i InfrastructureEventsHandler) Run() {
+func(i InfrastructureEventsHandler) Run(threshold time.Duration) {
 	go i.consumeClusterAlive()
-	go i.waitRequests()
+	go i.waitRequests(threshold)
 }
 
 // Endless loop waiting for requests
-func (i InfrastructureEventsHandler) waitRequests () {
+func (i InfrastructureEventsHandler) waitRequests (threshold time.Duration) {
 	log.Debug().Msg("wait for requests to be received by the infrastructure events queue")
 	for {
 		somethingReceived := false
-		ctx, cancel := context.WithTimeout(context.Background(), InfrastructureEventsTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), threshold)
 		currentTime := time.Now()
 		err := i.consumer.Consume(ctx)
 		somethingReceived = true
@@ -56,7 +56,8 @@ func (i InfrastructureEventsHandler) waitRequests () {
 		case <- ctx.Done():
 			// the timeout was reached
 			if !somethingReceived {
-				log.Debug().Msgf("no message received since %s",currentTime.Format(time.RFC3339))
+				i.clusterStatus = ClusterOffline
+				log.Debug().Str("cluster status", i.clusterStatus).Msgf("no message received since %s",currentTime.Format(time.RFC3339))
 			}
 		default:
 			if err != nil {
@@ -70,7 +71,8 @@ func (i InfrastructureEventsHandler) consumeClusterAlive () {
 	log.Debug().Msg("waiting for cluster alive checks...")
 	for {
 		received := <- i.consumer.Config.ChClusterAlive
-		log.Debug().Interface("clusterAlive",received).Msg("<- incoming cluster alive check")
+		i.clusterStatus = ClusterOnline
+		log.Debug().Interface("clusterAlive",received).Str("cluster status", i.clusterStatus).Msg("<- incoming cluster alive check")
 		err := i.connectivityManagerManager.ClusterAlive(received)
 		if err != nil {
 			log.Error().Err(err).Msg("failed processing cluster alive check")
