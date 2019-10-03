@@ -6,6 +6,8 @@ package queue
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/golang-lru"
 	"github.com/nalej/connectivity-manager/pkg/server/connectivity-manager"
 	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/events"
 	"github.com/rs/zerolog/log"
@@ -13,20 +15,17 @@ import (
 )
 
 const (
-	ClusterOffline = "offline"
-	ClusterOnline = "online"
-	ClusterOfflineCordon = "offlineCordon"
-	ClusterOnlineCordon = "offline"
-	ClusterUnknown = "unknown"
+	DefaultTimeout =  time.Minute
+	MaxCachedEntries = 50
 )
 
 type InfrastructureEventsHandler struct {
 	// reference manager for infrastructure
-	connectivityManagerManager *connectivity_manager.Manager
+	manager *connectivity_manager.Manager
 	// events consumer
 	consumer *events.InfrastructureEventsConsumer
-	// Cluster status: online, offline, onlineCordon, offlineCordon, unknown
-	clusterStatus string
+	// cache
+	clusterCache *lru.Cache
 }
 
 // Instantiate a new infrastructure events handler to manipulate messages from the infrastructure events queue.
@@ -34,22 +33,40 @@ type InfrastructureEventsHandler struct {
 //  cmManager
 //  cons
 func NewInfrastructureEventsHandler (connectivityManagerManager *connectivity_manager.Manager, consumer *events.InfrastructureEventsConsumer) InfrastructureEventsHandler {
-	ieHandler := InfrastructureEventsHandler{connectivityManagerManager: connectivityManagerManager, consumer: consumer, clusterStatus:ClusterUnknown}
-	log.Debug().Str("cluster status", ieHandler.clusterStatus).Msg("new infrastructure events handler created")
+	ieHandler := InfrastructureEventsHandler{manager: connectivityManagerManager, consumer: consumer}
+	log.Debug().Msg("new infrastructure events handler created")
 	return ieHandler
 }
 
+type clusterCacheEntry struct {
+	timestamp time.Time
+	clusterStatus string
+}
+
+func newClusterCacheEntry (clusterStatus string) *clusterCacheEntry {
+	return &clusterCacheEntry{
+		timestamp:     time.Now(),
+		clusterStatus: clusterStatus,
+	}
+}
+
 func(i InfrastructureEventsHandler) Run(threshold time.Duration) {
+	clusterCache, err := lru.New(MaxCachedEntries)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create cache")
+	}
+	i.clusterCache = clusterCache
 	go i.consumeClusterAlive()
-	go i.waitRequests(threshold)
+	go i.waitRequests()
+	go i.checkClusterStatusExpiration(threshold)
 }
 
 // Endless loop waiting for requests
-func (i InfrastructureEventsHandler) waitRequests (threshold time.Duration) {
+func (i InfrastructureEventsHandler) waitRequests () {
 	log.Debug().Msg("wait for requests to be received by the infrastructure events queue")
 	for {
 		somethingReceived := false
-		ctx, cancel := context.WithTimeout(context.Background(), threshold)
+		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		currentTime := time.Now()
 		err := i.consumer.Consume(ctx)
 		somethingReceived = true
@@ -58,8 +75,7 @@ func (i InfrastructureEventsHandler) waitRequests (threshold time.Duration) {
 		case <- ctx.Done():
 			// the timeout was reached
 			if !somethingReceived {
-				i.clusterStatus = ClusterOffline
-				log.Debug().Str("cluster status", i.clusterStatus).Msgf("no message received since %s",currentTime.Format(time.RFC3339))
+				log.Debug().Msgf("no message received since %s",currentTime.Format(time.RFC3339))
 			}
 		default:
 			if err != nil {
@@ -69,15 +85,24 @@ func (i InfrastructureEventsHandler) waitRequests (threshold time.Duration) {
 	}
 }
 
+func (i InfrastructureEventsHandler) getClusterKey(organizationID string, clusterID string) string{
+	return fmt.Sprintf("%s#%s", organizationID, clusterID)
+}
+
 func (i InfrastructureEventsHandler) consumeClusterAlive () {
 	log.Debug().Msg("waiting for cluster alive checks...")
 	for {
 		received := <- i.consumer.Config.ChClusterAlive
-		i.clusterStatus = ClusterOnline
-		log.Debug().Interface("clusterAlive",received).Str("cluster status", i.clusterStatus).Msg("<- incoming cluster alive check")
-		err := i.connectivityManagerManager.ClusterAlive(received)
-		if err != nil {
-			log.Error().Err(err).Msg("failed processing cluster alive check")
+		i.manager.ClusterAlive(received)
+	}
+}
+
+func (i InfrastructureEventsHandler) checkClusterStatusExpiration (threshold time.Duration) {
+	for {
+		ticker := time.NewTicker(threshold)
+		select {
+		case <-ticker.C:
+			i.manager.TransitionClustersToOffline()
 		}
 	}
 }

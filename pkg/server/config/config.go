@@ -2,7 +2,7 @@
  * Copyright (C) 2019 Nalej - All Rights Reserved
  */
 
-package server
+package config
 
 import (
 	"github.com/nalej/derrors"
@@ -16,6 +16,8 @@ type Config struct {
 	Port uint32
 	// Debugging flag
 	Debug bool
+	// SystemModelAddress with the host:port to connect to System Model
+	SystemModelAddress string
 	// URL for the message queue
 	QueueAddress string
 	// Grace Period
@@ -41,6 +43,7 @@ func (conf *Config) Validate() derrors.Error {
 func (conf * Config) Print() {
 	log.Info().Str("app", version.AppVersion).Str("commit", version.Commit).Msg("Version")
 	log.Info().Uint32("port", conf.Port).Msg("gRPC port")
+	log.Info().Str("URL", conf.SystemModelAddress).Msg("System Model")
 	log.Info().Dur("gracePeriod", conf.GracePeriod).Msg("Grace Period")
 	log.Info().Dur("threshold", conf.Threshold).Msg("Threshold")
 }

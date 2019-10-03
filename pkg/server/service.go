@@ -7,16 +7,18 @@
 package server
 
 import (
+	"fmt"
+	"github.com/nalej/connectivity-manager/pkg/queue"
+	"github.com/nalej/connectivity-manager/pkg/server/config"
 	connectivity_manager "github.com/nalej/connectivity-manager/pkg/server/connectivity-manager"
 	"github.com/nalej/derrors"
+	grpc_infrastructure_go "github.com/nalej/grpc-infrastructure-go"
 	pulsar_comcast "github.com/nalej/nalej-bus/pkg/bus/pulsar-comcast"
 	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/events"
-	"github.com/nalej/connectivity-manager/pkg/queue"
-	"google.golang.org/grpc"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
-	"fmt"
 )
 
 const (
@@ -27,10 +29,10 @@ type Service struct {
 	// Server for incoming requests
 	server *grpc.Server
 	// Configuration object
-	configuration *Config
+	configuration *config.Config
 }
 
-func NewService(config *Config) (*Service, error) {
+func NewService(config *config.Config) (*Service, error) {
 	server := grpc.NewServer()
 	instance := Service{
 		server:             server,
@@ -40,8 +42,24 @@ func NewService(config *Config) (*Service, error) {
 	return &instance, nil
 }
 
+type Clients struct {
+	ClusterClient grpc_infrastructure_go.ClustersClient
+}
+
 type BusClients struct {
 	InfrastructureEventsConsumer *events.InfrastructureEventsConsumer
+}
+
+// GetClients creates the required connections with the remote clients.
+func (s*Service) GetClients() (*Clients, derrors.Error) {
+	smConn, err := grpc.Dial(s.configuration.SystemModelAddress, grpc.WithInsecure())
+	if err != nil{
+		return nil, derrors.AsError(err, "cannot create connection with the system model component")
+	}
+
+	clClient := grpc_infrastructure_go.NewClustersClient(smConn)
+
+	return &Clients{clClient}, nil
 }
 
 // GetBusClients creates the required connections with the bus
@@ -70,15 +88,21 @@ func(s *Service) Run() {
 		log.Fatal().Errs("failed to listen: %v", []error{err})
 	}
 
+	clients, cErr := s.GetClients()
+	if cErr != nil{
+		log.Fatal().Str("err", cErr.DebugReport()).Msg("Cannot create clients")
+	}
+
 	busClients, bErr := s.GetBusClients()
-	if err != nil{
+	if bErr != nil{
 		log.Fatal().Str("err", bErr.DebugReport()).Msg("Cannot create bus clients")
 	}
 
-	connectivityManagerManager, err := connectivity_manager.NewManager(busClients.InfrastructureEventsConsumer)
+	connectivityManagerManager, err := connectivity_manager.NewManager(&clients.ClusterClient, busClients.InfrastructureEventsConsumer)
 	if err != nil{
 		log.Fatal().Str("err", err.Error()).Msg("Cannot create connectivity-manager manager")
 	}
+
 	infraEventsHandler := queue.NewInfrastructureEventsHandler(connectivityManagerManager, busClients.InfrastructureEventsConsumer)
 	infraEventsHandler.Run(s.configuration.Threshold)
 

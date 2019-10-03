@@ -6,12 +6,13 @@ package commands
 
 import (
 	"github.com/nalej/connectivity-manager/pkg/server"
+	config2 "github.com/nalej/connectivity-manager/pkg/server/config"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"time"
 )
 
-var config = server.Config{}
+var config = config2.Config{}
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -25,8 +26,9 @@ var runCmd = &cobra.Command{
 
 func init() {
 	runCmd.Flags().Uint32Var(&config.Port, "port", 8383, "port where connectivity-manager listens to")
+	runCmd.PersistentFlags().StringVar(&config.SystemModelAddress, "systemModelAddress", "localhost:8800",
+		"System Model address (host:port)")
 	runCmd.Flags().StringVar(&config.QueueAddress, "queueAddress", "","address of the nalej bus")
-	runCmd.Flags().DurationVar(&config.GracePeriod, "gracePeriod", 5*time.Minute, "grace period for a cluster to be considered OfflineCordon")
 	runCmd.Flags().DurationVar(&config.Threshold, "threshold", time.Minute, "threshold for a cluster to be considered Offline or Online")
 
 	rootCmd.AddCommand(runCmd)

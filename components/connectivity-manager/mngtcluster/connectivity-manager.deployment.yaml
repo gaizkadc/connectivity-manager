@@ -31,8 +31,8 @@ spec:
           - "run"
           - "--debug"
           - "--port=8383"
+          - "--systemModelAddress=system-model.__NPH_NAMESPACE:8800"
           - "--queueAddress=broker.__NPH_NAMESPACE:6650"
-          - "--gracePeriod=5m"
           - "--threshold=1m"
         securityContext:
           runAsUser: 2000
