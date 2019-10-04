@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DefaultTimeout =  time.Minute
+	DefaultTimeout =  2*time.Minute
 	MaxCachedEntries = 50
 )
 
@@ -66,13 +66,13 @@ func (i InfrastructureEventsHandler) waitRequests () {
 	log.Debug().Msg("wait for requests to be received by the infrastructure events queue")
 	for {
 		somethingReceived := false
-		ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		rCtx, rCancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		defer rCancel()
 		currentTime := time.Now()
-		err := i.consumer.Consume(ctx)
+		err := i.consumer.Consume(rCtx)
 		somethingReceived = true
-		cancel()
 		select {
-		case <- ctx.Done():
+		case <- rCtx.Done():
 			// the timeout was reached
 			if !somethingReceived {
 				log.Debug().Msgf("no message received since %s",currentTime.Format(time.RFC3339))

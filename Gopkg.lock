@@ -386,6 +386,7 @@
   input-imports = [
     "github.com/hashicorp/golang-lru",
     "github.com/nalej/derrors",
+    "github.com/nalej/grpc-common-go",
     "github.com/nalej/grpc-connectivity-manager-go",
     "github.com/nalej/grpc-infrastructure-go",
     "github.com/nalej/grpc-organization-go",

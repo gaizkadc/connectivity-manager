@@ -20,7 +20,7 @@ import (
 
 
 const (
-	DefaultTimeout =  time.Minute
+	DefaultTimeout =  2*time.Minute
 )
 
 // Manager structure with the remote clients required
@@ -37,8 +37,8 @@ type Manager struct {
 func NewManager(clustersClient *grpc_infrastructure_go.ClustersClient,organizationsClient *grpc_organization_go.OrganizationsClient,infrastructureEventsConsumer *events.InfrastructureEventsConsumer, config config.Config) (*Manager, error) {
 	return &Manager{
 		ClustersClient: *clustersClient,
-		InfrastructureEventsConsumer: infrastructureEventsConsumer,
 		OrganizationsClient: *organizationsClient,
+		InfrastructureEventsConsumer: infrastructureEventsConsumer,
 		config: config,
 	}, nil
 }
@@ -103,16 +103,15 @@ func (m *Manager) TransitionClustersToOffline() {
 			log.Error().Str("organizationID", org.OrganizationId).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to get the list of organization clusters, skipping transitioning clusters to offline in that organization")
 		}else{
 			for _, cluster := range clusters.Clusters{
-				m.checkClusterTransitionToOffline(cluster)
+				m.checkTransitionClusterToOffline(cluster)
 			}
 		}
 	}
 
 }
 
-func (m *Manager) checkClusterTransitionToOffline(cluster *grpc_infrastructure_go.Cluster) {
-	// check if the cluster is online or online_cordon
-	if cluster.LastAliveTimestamp < time.Now().Unix() - m.config.Threshold.Nanoseconds() {
+func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_go.Cluster) {
+	if time.Now().Unix() - cluster.LastAliveTimestamp > int64(m.config.Threshold.Seconds()) {
 		var nextStatus grpc_connectivity_manager_go.ClusterStatus
 		send := false
 		if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE{
@@ -137,9 +136,11 @@ func (m *Manager) checkClusterTransitionToOffline(cluster *grpc_infrastructure_g
 				log.Error().Interface("update", updateClusterRequest).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to transition cluster to OFFLINE*")
 			}
 		}
-	}else if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
-		if cluster.LastAliveTimestamp < time.Now().Unix() - cluster.GracePeriod{
-			// TODO Trigger policy
+	}
+	if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
+		log.Debug().Msg("transitioning cluster from offline to offline cordon")
+		if time.Now().Unix() - cluster.LastAliveTimestamp > cluster.GracePeriod {
+			// TODO Trigger Cordon policy
 			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
 				OrganizationId:       cluster.OrganizationId,
 				ClusterId:            cluster.ClusterId,

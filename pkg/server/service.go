@@ -13,6 +13,7 @@ import (
 	connectivity_manager "github.com/nalej/connectivity-manager/pkg/server/connectivity-manager"
 	"github.com/nalej/derrors"
 	grpc_infrastructure_go "github.com/nalej/grpc-infrastructure-go"
+	grpc_organization_go "github.com/nalej/grpc-organization-go"
 	pulsar_comcast "github.com/nalej/nalej-bus/pkg/bus/pulsar-comcast"
 	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/events"
 	"github.com/rs/zerolog/log"
@@ -44,6 +45,7 @@ func NewService(config *config.Config) (*Service, error) {
 
 type Clients struct {
 	ClusterClient grpc_infrastructure_go.ClustersClient
+	OrgClient grpc_organization_go.OrganizationsClient
 }
 
 type BusClients struct {
@@ -58,8 +60,9 @@ func (s*Service) GetClients() (*Clients, derrors.Error) {
 	}
 
 	clClient := grpc_infrastructure_go.NewClustersClient(smConn)
+	orgClient := grpc_organization_go.NewOrganizationsClient(smConn)
 
-	return &Clients{clClient}, nil
+	return &Clients{ClusterClient:clClient, OrgClient:orgClient}, nil
 }
 
 // GetBusClients creates the required connections with the bus
@@ -98,7 +101,7 @@ func(s *Service) Run() {
 		log.Fatal().Str("err", bErr.DebugReport()).Msg("Cannot create bus clients")
 	}
 
-	connectivityManagerManager, err := connectivity_manager.NewManager(&clients.ClusterClient, busClients.InfrastructureEventsConsumer)
+	connectivityManagerManager, err := connectivity_manager.NewManager(&clients.ClusterClient, &clients.OrgClient, busClients.InfrastructureEventsConsumer, *s.configuration)
 	if err != nil{
 		log.Fatal().Str("err", err.Error()).Msg("Cannot create connectivity-manager manager")
 	}
