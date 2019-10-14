@@ -7,5 +7,26 @@
     version="v0.0.3"
 
 [[constraint]]
-    name="github.com/nalej/nalej-bus"
+    name="github.com/nalej/grpc-organization-go"
+    version="=v0.0.29"
+
+[[constraint]]
+    name="github.com/nalej/grpc-infrastructure-go"
+    version="=v0.0.44"
+
+[[constraint]]
+    name="github.com/nalej/grpc-connectivity-manager-go"
+    version="=v0.0.2"
+
+[[constraint]]
+    name="github.com/nalej/grpc-public-api-go"
+    version="=v0.0.106"
+
+[[constraint]]
+    name = "github.com/nalej/nalej-bus"
+    #version="=v0.4.0"
     branch="master"
+
+[[constraint]]
+    name="github.com/nalej/grpc-utils"
+    version="v1.2.0"

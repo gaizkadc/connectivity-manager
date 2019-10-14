@@ -6,33 +6,59 @@ package queue
 
 import (
 	"context"
+	"fmt"
+	"github.com/hashicorp/golang-lru"
 	"github.com/nalej/connectivity-manager/pkg/server/connectivity-manager"
 	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/events"
 	"github.com/rs/zerolog/log"
 	"time"
 )
 
-// Timeout between incoming messages
-const InfrastructureEventsTimeout = time.Minute * 60
+const (
+	DefaultTimeout =  2*time.Minute
+	MaxCachedEntries = 50
+)
 
 type InfrastructureEventsHandler struct {
 	// reference manager for infrastructure
-	connectivityManagerManager *connectivity_manager.Manager
+	manager *connectivity_manager.Manager
 	// events consumer
 	consumer *events.InfrastructureEventsConsumer
+	// cache
+	clusterCache *lru.Cache
 }
 
-// Instantiate a new network ops handler to manipulate messages from the network ops queue.
+// Instantiate a new infrastructure events handler to manipulate messages from the infrastructure events queue.
 // params:
-//  netManager
+//  cmManager
 //  cons
 func NewInfrastructureEventsHandler (connectivityManagerManager *connectivity_manager.Manager, consumer *events.InfrastructureEventsConsumer) InfrastructureEventsHandler {
-	return InfrastructureEventsHandler{connectivityManagerManager: connectivityManagerManager, consumer: consumer}
+	ieHandler := InfrastructureEventsHandler{manager: connectivityManagerManager, consumer: consumer}
+	log.Debug().Msg("new infrastructure events handler created")
+	return ieHandler
 }
 
-func(i InfrastructureEventsHandler) Run() {
+type clusterCacheEntry struct {
+	timestamp time.Time
+	clusterStatus string
+}
+
+func newClusterCacheEntry (clusterStatus string) *clusterCacheEntry {
+	return &clusterCacheEntry{
+		timestamp:     time.Now(),
+		clusterStatus: clusterStatus,
+	}
+}
+
+func(i InfrastructureEventsHandler) Run(threshold time.Duration) {
+	clusterCache, err := lru.New(MaxCachedEntries)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create cache")
+	}
+	i.clusterCache = clusterCache
 	go i.consumeClusterAlive()
 	go i.waitRequests()
+	go i.checkClusterStatusExpiration(threshold)
 }
 
 // Endless loop waiting for requests
@@ -40,13 +66,13 @@ func (i InfrastructureEventsHandler) waitRequests () {
 	log.Debug().Msg("wait for requests to be received by the infrastructure events queue")
 	for {
 		somethingReceived := false
-		ctx, cancel := context.WithTimeout(context.Background(), InfrastructureEventsTimeout)
+		rCtx, rCancel := context.WithTimeout(context.Background(), DefaultTimeout)
+		defer rCancel()
 		currentTime := time.Now()
-		err := i.consumer.Consume(ctx)
+		err := i.consumer.Consume(rCtx)
 		somethingReceived = true
-		cancel()
 		select {
-		case <- ctx.Done():
+		case <- rCtx.Done():
 			// the timeout was reached
 			if !somethingReceived {
 				log.Debug().Msgf("no message received since %s",currentTime.Format(time.RFC3339))
@@ -59,14 +85,24 @@ func (i InfrastructureEventsHandler) waitRequests () {
 	}
 }
 
+func (i InfrastructureEventsHandler) getClusterKey(organizationID string, clusterID string) string{
+	return fmt.Sprintf("%s#%s", organizationID, clusterID)
+}
+
 func (i InfrastructureEventsHandler) consumeClusterAlive () {
 	log.Debug().Msg("waiting for cluster alive checks...")
 	for {
 		received := <- i.consumer.Config.ChClusterAlive
-		log.Debug().Interface("clusterAlive",received).Msg("<- incoming cluster alive check")
-		err := i.connectivityManagerManager.ClusterAlive(received)
-		if err != nil {
-			log.Error().Err(err).Msg("failed processing cluster alive check")
+		i.manager.ClusterAlive(received)
+	}
+}
+
+func (i InfrastructureEventsHandler) checkClusterStatusExpiration (threshold time.Duration) {
+	for {
+		ticker := time.NewTicker(threshold)
+		select {
+		case <-ticker.C:
+			i.manager.TransitionClustersToOffline()
 		}
 	}
 }
