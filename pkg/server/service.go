@@ -86,12 +86,15 @@ func (s*Service) GetBusClients() (*BusClients, derrors.Error) {
 }
 
 func(s *Service) Run() {
-	s.configuration.Validate()
+	vErr := s.configuration.Validate()
+	if vErr != nil {
+		log.Fatal().Str("err", vErr.DebugReport()).Msg("invalid configuration")
+	}
 	s.configuration.Print()
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.configuration.Port))
-	if err != nil {
-		log.Fatal().Errs("failed to listen: %v", []error{err})
+	lis, lErr := net.Listen("tcp", fmt.Sprintf(":%d", s.configuration.Port))
+	if lErr != nil {
+		log.Fatal().Errs("failed to listen: %v", []error{lErr})
 	}
 
 	clients, cErr := s.GetClients()
@@ -104,9 +107,9 @@ func(s *Service) Run() {
 		log.Fatal().Str("err", bErr.DebugReport()).Msg("Cannot create bus clients")
 	}
 
-	connectivityManagerManager, err := connectivity_manager.NewManager(&clients.ClusterClient, &clients.OrgClient, busClients.InfrastructureEventsConsumer, *s.configuration)
-	if err != nil{
-		log.Fatal().Str("err", err.Error()).Msg("Cannot create connectivity-manager manager")
+	connectivityManagerManager, nmErr := connectivity_manager.NewManager(&clients.ClusterClient, &clients.OrgClient, busClients.InfrastructureEventsConsumer, *s.configuration)
+	if nmErr != nil{
+		log.Fatal().Str("err", nmErr.Error()).Msg("Cannot create connectivity-manager manager")
 	}
 
 	infraEventsHandler := queue.NewInfrastructureEventsHandler(connectivityManagerManager, busClients.InfrastructureEventsConsumer)
