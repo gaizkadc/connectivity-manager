@@ -58,7 +58,6 @@ func (m * Manager) ClusterAlive (alive *grpc_connectivity_manager_go.ClusterAliv
 		return conversions.ToDerror(err)
 	}
 
-
 	updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest{
 		OrganizationId:       alive.OrganizationId,
 		ClusterId:            alive.ClusterId,
@@ -66,9 +65,19 @@ func (m * Manager) ClusterAlive (alive *grpc_connectivity_manager_go.ClusterAliv
 		LastClusterTimestamp: alive.Timestamp,
 	}
 
-	if previous.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE || previous.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_UNKNOWN{
+	var nextStatus grpc_connectivity_manager_go.ClusterStatus
+	send := false
+	if previous.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE || previous.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_UNKNOWN {
+		nextStatus = grpc_connectivity_manager_go.ClusterStatus_ONLINE
+		send = true
+	} else if previous.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE_CORDON {
+		nextStatus = grpc_connectivity_manager_go.ClusterStatus_ONLINE_CORDON
+		send = true
+	}
+
+	if send {
 		updateClusterRequest.UpdateStatus = true
-		updateClusterRequest.Status = grpc_connectivity_manager_go.ClusterStatus_ONLINE
+		updateClusterRequest.Status = nextStatus
 	}
 
 	updateCtx, updateCancel := context.WithTimeout(context.Background(), DefaultTimeout)
@@ -114,10 +123,10 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 	if time.Now().Unix() - cluster.LastAliveTimestamp > int64(m.config.Threshold.Seconds()) {
 		var nextStatus grpc_connectivity_manager_go.ClusterStatus
 		send := false
-		if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE{
+		if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE {
 			nextStatus = grpc_connectivity_manager_go.ClusterStatus_OFFLINE
 			send = true
-		}else if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE_CORDON{
+		}else if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE_CORDON {
 			nextStatus = grpc_connectivity_manager_go.ClusterStatus_OFFLINE_CORDON
 			send = true
 		}

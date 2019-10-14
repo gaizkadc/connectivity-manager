@@ -6,13 +6,13 @@ package commands
 
 import (
 	"github.com/nalej/connectivity-manager/pkg/server"
-	config2 "github.com/nalej/connectivity-manager/pkg/server/config"
+	cmConfig "github.com/nalej/connectivity-manager/pkg/server/config"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"time"
 )
 
-var config = config2.Config{}
+var config = cmConfig.Config{}
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -40,6 +40,5 @@ func RunConnectivityManager() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("error creating connectivity-manager")
 	}
-	config.Print()
 	server.Run()
 }

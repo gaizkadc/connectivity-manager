@@ -20,8 +20,6 @@ type Config struct {
 	SystemModelAddress string
 	// URL for the message queue
 	QueueAddress string
-	// Grace Period
-	GracePeriod time.Duration
 	// Threshold
 	Threshold time.Duration
 }
@@ -33,9 +31,6 @@ func (conf *Config) Validate() derrors.Error {
 	if conf.QueueAddress == "" {
 		return derrors.NewInvalidArgumentError("queue address must be set")
 	}
-	if conf.GracePeriod < conf.Threshold {
-		return derrors.NewInvalidArgumentError("threshold can't be longer than gracePeriod")
-	}
 
 	return nil
 }
@@ -44,6 +39,5 @@ func (conf * Config) Print() {
 	log.Info().Str("app", version.AppVersion).Str("commit", version.Commit).Msg("Version")
 	log.Info().Uint32("port", conf.Port).Msg("gRPC port")
 	log.Info().Str("URL", conf.SystemModelAddress).Msg("System Model")
-	log.Info().Dur("gracePeriod", conf.GracePeriod).Msg("Grace Period")
 	log.Info().Dur("threshold", conf.Threshold).Msg("Threshold")
 }
