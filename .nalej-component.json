@@ -1,6 +1,10 @@
 {
     "language": "golang",
+    "version": "v0.4.0",
     "application_list": [
+        "connectivity-manager"
+    ],
+    "image_list": [
         "connectivity-manager"
     ],
     "tools": [
