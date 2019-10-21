@@ -167,10 +167,11 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 
 			// Trigger Offline policy
 			drainClusterRequest := &grpc_conductor_go.DrainClusterRequest{
-				ClusterId:            &grpc_infrastructure_go.ClusterId{
-					OrganizationId:       cluster.OrganizationId,
-					ClusterId:            cluster.ClusterId,
+				ClusterId: &grpc_infrastructure_go.ClusterId{
+					OrganizationId: cluster.OrganizationId,
+					ClusterId:      cluster.ClusterId,
 				},
+				ClusterOffline:       true,
 			}
 			drainCtx, drainCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 			defer drainCancel()
