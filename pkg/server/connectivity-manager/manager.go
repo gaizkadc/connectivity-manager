@@ -9,11 +9,13 @@ import (
 	"github.com/nalej/connectivity-manager/pkg/server/config"
 	"github.com/nalej/derrors"
 	"github.com/nalej/grpc-common-go"
+	grpc_conductor_go "github.com/nalej/grpc-conductor-go"
 	"github.com/nalej/grpc-connectivity-manager-go"
 	"github.com/nalej/grpc-infrastructure-go"
 	"github.com/nalej/grpc-organization-go"
 	"github.com/nalej/grpc-utils/pkg/conversions"
 	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/events"
+	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/ops"
 	"github.com/rs/zerolog/log"
 	"time"
 )
@@ -27,6 +29,7 @@ const (
 type Manager struct {
 	OrganizationsClient          grpc_organization_go.OrganizationsClient
 	ClustersClient               grpc_infrastructure_go.ClustersClient
+	InfrastructureOpsProducer	*ops.InfrastructureOpsProducer
 	InfrastructureEventsConsumer *events.InfrastructureEventsConsumer
 	config                       config.Config
 }
@@ -149,7 +152,6 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 	if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
 		log.Debug().Msg("transitioning cluster from offline to offline cordon")
 		if time.Now().Unix() - cluster.LastAliveTimestamp > cluster.GracePeriod {
-			// TODO Trigger Cordon policy
 			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
 				OrganizationId:       cluster.OrganizationId,
 				ClusterId:            cluster.ClusterId,
@@ -161,6 +163,20 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 			_, err := m.ClustersClient.UpdateCluster(updateCtx, updateClusterRequest)
 			if err != nil{
 				log.Error().Interface("update", updateClusterRequest).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to transition cluster to OFFLINE_CORDON")
+				}
+
+			// Trigger Offline policy
+			drainClusterRequest := &grpc_conductor_go.DrainClusterRequest{
+				ClusterId:            &grpc_infrastructure_go.ClusterId{
+					OrganizationId:       cluster.OrganizationId,
+					ClusterId:            cluster.ClusterId,
+				},
+			}
+			drainCtx, drainCancel := context.WithTimeout(context.Background(), DefaultTimeout)
+			defer drainCancel()
+			err = m.InfrastructureOpsProducer.Send(drainCtx, drainClusterRequest)
+			if err != nil {
+				log.Error().Interface("send drain cluster request", updateClusterRequest).Str("trace", err.Error()).Msg("unable to send drain cluster request")
 			}
 		}
 	}
