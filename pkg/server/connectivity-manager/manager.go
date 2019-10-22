@@ -37,11 +37,16 @@ type Manager struct {
 
 
 // NewManager creates a new manager.
-func NewManager(clustersClient *grpc_infrastructure_go.ClustersClient,organizationsClient *grpc_organization_go.OrganizationsClient,infrastructureEventsConsumer *events.InfrastructureEventsConsumer, config config.Config) (*Manager, error) {
+func NewManager(clustersClient *grpc_infrastructure_go.ClustersClient,
+	organizationsClient *grpc_organization_go.OrganizationsClient,
+	infrastructureEventsConsumer *events.InfrastructureEventsConsumer,
+	infrastructureOpsProducer *ops.InfrastructureOpsProducer,
+	config config.Config) (*Manager, error) {
 	return &Manager{
 		ClustersClient: *clustersClient,
 		OrganizationsClient: *organizationsClient,
 		InfrastructureEventsConsumer: infrastructureEventsConsumer,
+		InfrastructureOpsProducer:infrastructureOpsProducer,
 		config: config,
 	}, nil
 }
@@ -150,8 +155,8 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 		}
 	}
 	if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
-		log.Debug().Msg("transitioning cluster from offline to offline cordon")
 		if time.Now().Unix() - cluster.LastAliveTimestamp > cluster.GracePeriod {
+			log.Debug().Msg("transitioning cluster from offline to offline cordon")
 			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
 				OrganizationId:       cluster.OrganizationId,
 				ClusterId:            cluster.ClusterId,
@@ -175,10 +180,11 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 			}
 			drainCtx, drainCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 			defer drainCancel()
-			err = m.InfrastructureOpsProducer.Send(drainCtx, drainClusterRequest)
-			if err != nil {
-				log.Error().Interface("send drain cluster request", updateClusterRequest).Str("trace", err.Error()).Msg("unable to send drain cluster request")
+			drainErr := m.InfrastructureOpsProducer.Send(drainCtx, drainClusterRequest)
+			if drainErr != nil {
+				log.Error().Interface("send drain cluster request", drainClusterRequest).Str("trace", drainErr.Error()).Msg("unable to send drain cluster request")
 			}
+			log.Debug().Str("cluster id", cluster.ClusterId).Str("organization id", cluster.OrganizationId).Msg("drain cluster request sent to the bus")
 		}
 	}
 }
