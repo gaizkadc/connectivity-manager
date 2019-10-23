@@ -157,6 +157,7 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 	if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
 		if time.Now().Unix() - cluster.LastAliveTimestamp > cluster.GracePeriod {
 			log.Debug().Msg("transitioning cluster from offline to offline cordon")
+			m.config.OfflinePolicy = grpc_connectivity_manager_go.OfflinePolicy_DRAIN
 			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
 				OrganizationId:       cluster.OrganizationId,
 				ClusterId:            cluster.ClusterId,
@@ -171,20 +172,32 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 				}
 
 			// Trigger Offline policy
-			drainClusterRequest := &grpc_conductor_go.DrainClusterRequest{
-				ClusterId: &grpc_infrastructure_go.ClusterId{
-					OrganizationId: cluster.OrganizationId,
-					ClusterId:      cluster.ClusterId,
-				},
-				ClusterOffline:       true,
+			switch m.config.OfflinePolicy {
+			case grpc_connectivity_manager_go.OfflinePolicy_NONE:
+				log.Debug().Str("offline policy", m.config.OfflinePolicy.String()).Msg("offline policy set to none, no additional steps required")
+			case grpc_connectivity_manager_go.OfflinePolicy_DRAIN:
+				triggerOfflinePolicy(cluster, m)
+			default:
+				log.Debug().Msg("offline policy not set, doing nothing")
 			}
-			drainCtx, drainCancel := context.WithTimeout(context.Background(), DefaultTimeout)
-			defer drainCancel()
-			drainErr := m.InfrastructureOpsProducer.Send(drainCtx, drainClusterRequest)
-			if drainErr != nil {
-				log.Error().Interface("send drain cluster request", drainClusterRequest).Str("trace", drainErr.Error()).Msg("unable to send drain cluster request")
-			}
-			log.Debug().Str("cluster id", cluster.ClusterId).Str("organization id", cluster.OrganizationId).Msg("drain cluster request sent to the bus")
+
 		}
 	}
+}
+
+func triggerOfflinePolicy (cluster *grpc_infrastructure_go.Cluster, m *Manager) {
+	drainClusterRequest := &grpc_conductor_go.DrainClusterRequest{
+		ClusterId: &grpc_infrastructure_go.ClusterId{
+			OrganizationId: cluster.OrganizationId,
+			ClusterId:      cluster.ClusterId,
+		},
+		ClusterOffline:       true,
+	}
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer drainCancel()
+	drainErr := m.InfrastructureOpsProducer.Send(drainCtx, drainClusterRequest)
+	if drainErr != nil {
+		log.Error().Interface("send drain cluster request", drainClusterRequest).Str("trace", drainErr.Error()).Msg("unable to send drain cluster request")
+	}
+	log.Debug().Str("cluster id", cluster.ClusterId).Str("organization id", cluster.OrganizationId).Msg("drain cluster request sent to the bus")
 }
