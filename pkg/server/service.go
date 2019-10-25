@@ -84,11 +84,6 @@ func (s*Service) GetBusClients() (*BusClients, derrors.Error) {
 		return nil, err
 	}
 
-	// Infrastructure Ops Producer
-	//InfrastructureOpsProducerStruct := infra_ops.ConsumableStructsInfrastructureOpsConsumer{
-	//	DrainRequest: true,
-	//}
-	//infrastructureOpsProducerConfig := infra_ops.NewConfigInfrastructureOpsConsumer(5, InfrastructureOpsProducerStruct)
 	infraOpsProducer, err := infra_ops.NewInfrastructureOpsProducer(queueClient, InfrastructureOpsProducerName)
 	if err != nil {
 		return nil, err

@@ -34,8 +34,6 @@ type Manager struct {
 	config                       config.Config
 }
 
-
-
 // NewManager creates a new manager.
 func NewManager(clustersClient *grpc_infrastructure_go.ClustersClient,
 	organizationsClient *grpc_organization_go.OrganizationsClient,
@@ -124,7 +122,6 @@ func (m *Manager) TransitionClustersToOffline() {
 			}
 		}
 	}
-
 }
 
 func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_go.Cluster) {
@@ -170,22 +167,25 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 			if err != nil{
 				log.Error().Interface("update", updateClusterRequest).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to transition cluster to OFFLINE_CORDON")
 				}
-
-			// Trigger Offline policy
-			switch m.config.OfflinePolicy {
-			case grpc_connectivity_manager_go.OfflinePolicy_NONE:
-				log.Debug().Str("offline policy", m.config.OfflinePolicy.String()).Msg("offline policy set to none, no additional steps required")
-			case grpc_connectivity_manager_go.OfflinePolicy_DRAIN:
-				triggerOfflinePolicy(cluster, m)
-			default:
-				log.Debug().Msg("offline policy not set, doing nothing")
-			}
-
 		}
+	}
+	m.checkOfflinePolicy(cluster)
+}
+
+// Checks if an OfflinePolicy is set and acts accordingly
+func (m *Manager) checkOfflinePolicy (cluster *grpc_infrastructure_go.Cluster) {
+	switch m.config.OfflinePolicy {
+	case grpc_connectivity_manager_go.OfflinePolicy_NONE:
+		log.Debug().Str("offline policy", m.config.OfflinePolicy.String()).Msg("offline policy set to none, no additional steps required")
+	case grpc_connectivity_manager_go.OfflinePolicy_DRAIN:
+		m.triggerDrainOfflinePolicy(cluster)
+	default:
+		log.Debug().Msg("offline policy not set, doing nothing")
 	}
 }
 
-func triggerOfflinePolicy (cluster *grpc_infrastructure_go.Cluster, m *Manager) {
+// Triggers a drain offline policy and drains the cluster passed as parameter
+func (m *Manager) triggerDrainOfflinePolicy (cluster *grpc_infrastructure_go.Cluster) {
 	drainClusterRequest := &grpc_conductor_go.DrainClusterRequest{
 		ClusterId: &grpc_infrastructure_go.ClusterId{
 			OrganizationId: cluster.OrganizationId,

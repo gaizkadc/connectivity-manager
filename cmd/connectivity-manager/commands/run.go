@@ -43,7 +43,7 @@ func RunConnectivityManager() {
 
 	policy, exists := grpc_connectivity_manager_go.OfflinePolicy_value[strings.ToUpper(policyName)]
 	if ! exists{
-		log.Error().Msg("invalid offline policy set")
+		log.Fatal().Msg("invalid offline policy set")
 	}
 	config.OfflinePolicy = grpc_connectivity_manager_go.OfflinePolicy(policy)
 

@@ -385,6 +385,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/golang/protobuf/proto",
     "github.com/hashicorp/golang-lru",
     "github.com/nalej/derrors",
     "github.com/nalej/grpc-common-go",
