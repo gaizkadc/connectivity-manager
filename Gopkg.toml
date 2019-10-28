@@ -19,10 +19,6 @@
     version="=v0.0.3"
 
 [[constraint]]
-    name="github.com/nalej/grpc-public-api-go"
-    version="=v0.0.106"
-
-[[constraint]]
     name = "github.com/nalej/nalej-bus"
     #version="=v0.4.0"
     branch="master"
