@@ -167,13 +167,14 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 			if err != nil{
 				log.Error().Interface("update", updateClusterRequest).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to transition cluster to OFFLINE_CORDON")
 				}
+			m.triggerOfflinePolicy(cluster)
 		}
 	}
-	m.checkOfflinePolicy(cluster)
 }
 
 // Checks if an OfflinePolicy is set and acts accordingly
-func (m *Manager) checkOfflinePolicy (cluster *grpc_infrastructure_go.Cluster) {
+func (m *Manager) triggerOfflinePolicy(cluster *grpc_infrastructure_go.Cluster) {
+	log.Debug().Interface("cluster", cluster).Msg("triggering offline policy")
 	switch m.config.OfflinePolicy {
 	case grpc_connectivity_manager_go.OfflinePolicy_NONE:
 		log.Debug().Str("offline policy", m.config.OfflinePolicy.String()).Msg("offline policy set to none, no additional steps required")
