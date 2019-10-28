@@ -154,7 +154,6 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 	if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
 		if time.Now().Unix() - cluster.LastAliveTimestamp > cluster.GracePeriod {
 			log.Debug().Msg("transitioning cluster from offline to offline cordon")
-			m.config.OfflinePolicy = grpc_connectivity_manager_go.OfflinePolicy_DRAIN
 			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
 				OrganizationId:       cluster.OrganizationId,
 				ClusterId:            cluster.ClusterId,
