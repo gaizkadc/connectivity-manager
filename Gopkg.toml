@@ -16,11 +16,7 @@
 
 [[constraint]]
     name="github.com/nalej/grpc-connectivity-manager-go"
-    version="=v0.0.2"
-
-[[constraint]]
-    name="github.com/nalej/grpc-public-api-go"
-    version="=v0.0.106"
+    version="=v0.0.3"
 
 [[constraint]]
     name = "github.com/nalej/nalej-bus"

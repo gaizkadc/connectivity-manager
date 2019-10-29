@@ -9,11 +9,13 @@ import (
 	"github.com/nalej/connectivity-manager/pkg/server/config"
 	"github.com/nalej/derrors"
 	"github.com/nalej/grpc-common-go"
+	grpc_conductor_go "github.com/nalej/grpc-conductor-go"
 	"github.com/nalej/grpc-connectivity-manager-go"
 	"github.com/nalej/grpc-infrastructure-go"
 	"github.com/nalej/grpc-organization-go"
 	"github.com/nalej/grpc-utils/pkg/conversions"
 	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/events"
+	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/ops"
 	"github.com/rs/zerolog/log"
 	"time"
 )
@@ -27,18 +29,22 @@ const (
 type Manager struct {
 	OrganizationsClient          grpc_organization_go.OrganizationsClient
 	ClustersClient               grpc_infrastructure_go.ClustersClient
+	InfrastructureOpsProducer	*ops.InfrastructureOpsProducer
 	InfrastructureEventsConsumer *events.InfrastructureEventsConsumer
 	config                       config.Config
 }
 
-
-
 // NewManager creates a new manager.
-func NewManager(clustersClient *grpc_infrastructure_go.ClustersClient,organizationsClient *grpc_organization_go.OrganizationsClient,infrastructureEventsConsumer *events.InfrastructureEventsConsumer, config config.Config) (*Manager, error) {
+func NewManager(clustersClient *grpc_infrastructure_go.ClustersClient,
+	organizationsClient *grpc_organization_go.OrganizationsClient,
+	infrastructureEventsConsumer *events.InfrastructureEventsConsumer,
+	infrastructureOpsProducer *ops.InfrastructureOpsProducer,
+	config config.Config) (*Manager, error) {
 	return &Manager{
 		ClustersClient: *clustersClient,
 		OrganizationsClient: *organizationsClient,
 		InfrastructureEventsConsumer: infrastructureEventsConsumer,
+		InfrastructureOpsProducer:infrastructureOpsProducer,
 		config: config,
 	}, nil
 }
@@ -116,7 +122,6 @@ func (m *Manager) TransitionClustersToOffline() {
 			}
 		}
 	}
-
 }
 
 func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_go.Cluster) {
@@ -147,9 +152,8 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 		}
 	}
 	if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
-		log.Debug().Msg("transitioning cluster from offline to offline cordon")
 		if time.Now().Unix() - cluster.LastAliveTimestamp > cluster.GracePeriod {
-			// TODO Trigger Cordon policy
+			log.Debug().Msg("transitioning cluster from offline to offline cordon")
 			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
 				OrganizationId:       cluster.OrganizationId,
 				ClusterId:            cluster.ClusterId,
@@ -161,7 +165,39 @@ func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_g
 			_, err := m.ClustersClient.UpdateCluster(updateCtx, updateClusterRequest)
 			if err != nil{
 				log.Error().Interface("update", updateClusterRequest).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to transition cluster to OFFLINE_CORDON")
-			}
+				}
+			m.triggerOfflinePolicy(cluster)
 		}
 	}
+}
+
+// Checks if an OfflinePolicy is set and acts accordingly
+func (m *Manager) triggerOfflinePolicy(cluster *grpc_infrastructure_go.Cluster) {
+	log.Debug().Interface("cluster", cluster).Msg("triggering offline policy")
+	switch m.config.OfflinePolicy {
+	case grpc_connectivity_manager_go.OfflinePolicy_NONE:
+		log.Debug().Str("offline policy", m.config.OfflinePolicy.String()).Msg("offline policy set to none, no additional steps required")
+	case grpc_connectivity_manager_go.OfflinePolicy_DRAIN:
+		m.triggerDrainOfflinePolicy(cluster)
+	default:
+		log.Debug().Msg("offline policy not set, doing nothing")
+	}
+}
+
+// Triggers a drain offline policy and drains the cluster passed as parameter
+func (m *Manager) triggerDrainOfflinePolicy (cluster *grpc_infrastructure_go.Cluster) {
+	drainClusterRequest := &grpc_conductor_go.DrainClusterRequest{
+		ClusterId: &grpc_infrastructure_go.ClusterId{
+			OrganizationId: cluster.OrganizationId,
+			ClusterId:      cluster.ClusterId,
+		},
+		ClusterOffline:       true,
+	}
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer drainCancel()
+	drainErr := m.InfrastructureOpsProducer.Send(drainCtx, drainClusterRequest)
+	if drainErr != nil {
+		log.Error().Interface("send drain cluster request", drainClusterRequest).Str("trace", drainErr.Error()).Msg("unable to send drain cluster request")
+	}
+	log.Debug().Str("cluster id", cluster.ClusterId).Str("organization id", cluster.OrganizationId).Msg("drain cluster request sent to the bus")
 }

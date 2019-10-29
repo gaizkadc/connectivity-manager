@@ -16,6 +16,7 @@ import (
 	grpc_organization_go "github.com/nalej/grpc-organization-go"
 	pulsar_comcast "github.com/nalej/nalej-bus/pkg/bus/pulsar-comcast"
 	"github.com/nalej/nalej-bus/pkg/queue/infrastructure/events"
+	infra_ops "github.com/nalej/nalej-bus/pkg/queue/infrastructure/ops"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -23,7 +24,8 @@ import (
 )
 
 const (
-	InfrastructureEventsConsumerName = "ApplicationManager-app_ops"
+	InfrastructureEventsConsumerName = "ConnectivityManager-infra_events"
+	InfrastructureOpsProducerName = "ConnectivityManager-infra_ops"
 )
 
 type Service struct {
@@ -50,6 +52,7 @@ type Clients struct {
 
 type BusClients struct {
 	InfrastructureEventsConsumer *events.InfrastructureEventsConsumer
+	InfrastructureOpsProducer *infra_ops.InfrastructureOpsProducer
 }
 
 // GetClients creates the required connections with the remote clients.
@@ -69,6 +72,7 @@ func (s*Service) GetClients() (*Clients, derrors.Error) {
 func (s*Service) GetBusClients() (*BusClients, derrors.Error) {
 	queueClient := pulsar_comcast.NewClient(s.configuration.QueueAddress, nil)
 
+	// Infrastructure Events Consumer
 	InfrastructureEventsConsumerStruct := events.ConsumableStructsInfrastructureEventsConsumer{
 		UpdateClusterRequest:    false,
 		SetClusterStatusRequest: false,
@@ -80,8 +84,14 @@ func (s*Service) GetBusClients() (*BusClients, derrors.Error) {
 		return nil, err
 	}
 
+	infraOpsProducer, err := infra_ops.NewInfrastructureOpsProducer(queueClient, InfrastructureOpsProducerName)
+	if err != nil {
+		return nil, err
+	}
+
 	return &BusClients{
 		InfrastructureEventsConsumer:infraEventsConsumer,
+		InfrastructureOpsProducer:infraOpsProducer,
 	}, nil
 }
 
@@ -107,7 +117,12 @@ func(s *Service) Run() {
 		log.Fatal().Str("err", bErr.DebugReport()).Msg("Cannot create bus clients")
 	}
 
-	connectivityManagerManager, nmErr := connectivity_manager.NewManager(&clients.ClusterClient, &clients.OrgClient, busClients.InfrastructureEventsConsumer, *s.configuration)
+	connectivityManagerManager, nmErr := connectivity_manager.NewManager(
+		&clients.ClusterClient,
+		&clients.OrgClient,
+		busClients.InfrastructureEventsConsumer,
+		busClients.InfrastructureOpsProducer,
+		*s.configuration)
 	if nmErr != nil{
 		log.Fatal().Str("err", nmErr.Error()).Msg("Cannot create connectivity-manager manager")
 	}

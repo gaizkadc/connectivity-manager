@@ -7,12 +7,16 @@ package commands
 import (
 	"github.com/nalej/connectivity-manager/pkg/server"
 	cmConfig "github.com/nalej/connectivity-manager/pkg/server/config"
+	grpc_connectivity_manager_go "github.com/nalej/grpc-connectivity-manager-go"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"strings"
 	"time"
 )
 
 var config = cmConfig.Config{}
+
+var policyName string
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -30,11 +34,19 @@ func init() {
 		"System Model address (host:port)")
 	runCmd.Flags().StringVar(&config.QueueAddress, "queueAddress", "","address of the nalej bus")
 	runCmd.Flags().DurationVar(&config.Threshold, "threshold", time.Minute, "threshold for a cluster to be considered Offline or Online")
+	runCmd.Flags().StringVar(&policyName, "offlinePolicy", "none", "Offline policy to trigger when cordoning an offline cluster: none or drain")
 
 	rootCmd.AddCommand(runCmd)
 }
 
 func RunConnectivityManager() {
+
+	policy, exists := grpc_connectivity_manager_go.OfflinePolicy_value[strings.ToUpper(policyName)]
+	if ! exists{
+		log.Fatal().Msg("invalid offline policy set")
+	}
+	config.OfflinePolicy = grpc_connectivity_manager_go.OfflinePolicy(policy)
+
 	log.Info().Msg("Launching connectivity-manager!")
 	server, err := server.NewService(&config)
 	if err != nil {

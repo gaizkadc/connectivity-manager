@@ -33,6 +33,7 @@ spec:
           - "--port=8383"
           - "--systemModelAddress=system-model.__NPH_NAMESPACE:8800"
           - "--queueAddress=broker.__NPH_NAMESPACE:6650"
+          - "--offlinePolicy=none"
           - "--threshold=1m"
         securityContext:
           runAsUser: 2000
