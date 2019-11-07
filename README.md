@@ -18,8 +18,6 @@ When a new platform is installed a `grace-period` is set (120 s by default) and 
 
 ### Prerequisites
 
-Detail any component that has to be installed to run this component.
-
 * conductor
 * connectivity-checker
 
