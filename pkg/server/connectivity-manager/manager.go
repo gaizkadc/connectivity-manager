@@ -1,5 +1,17 @@
 /*
- * Copyright (C) 2019 Nalej - All Rights Reserved
+ * Copyright 2019 Nalej
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package connectivity_manager
@@ -20,16 +32,15 @@ import (
 	"time"
 )
 
-
 const (
-	DefaultTimeout =  2*time.Minute
+	DefaultTimeout = 2 * time.Minute
 )
 
 // Manager structure with the remote clients required
 type Manager struct {
 	OrganizationsClient          grpc_organization_go.OrganizationsClient
 	ClustersClient               grpc_infrastructure_go.ClustersClient
-	InfrastructureOpsProducer	*ops.InfrastructureOpsProducer
+	InfrastructureOpsProducer    *ops.InfrastructureOpsProducer
 	InfrastructureEventsConsumer *events.InfrastructureEventsConsumer
 	config                       config.Config
 }
@@ -41,34 +52,34 @@ func NewManager(clustersClient *grpc_infrastructure_go.ClustersClient,
 	infrastructureOpsProducer *ops.InfrastructureOpsProducer,
 	config config.Config) (*Manager, error) {
 	return &Manager{
-		ClustersClient: *clustersClient,
-		OrganizationsClient: *organizationsClient,
+		ClustersClient:               *clustersClient,
+		OrganizationsClient:          *organizationsClient,
 		InfrastructureEventsConsumer: infrastructureEventsConsumer,
-		InfrastructureOpsProducer:infrastructureOpsProducer,
-		config: config,
+		InfrastructureOpsProducer:    infrastructureOpsProducer,
+		config:                       config,
 	}, nil
 }
 
-func (m * Manager) ClusterAlive (alive *grpc_connectivity_manager_go.ClusterAlive) derrors.Error {
+func (m *Manager) ClusterAlive(alive *grpc_connectivity_manager_go.ClusterAlive) derrors.Error {
 	log.Debug().Interface("clusterAlive", alive).Msg("<- incoming cluster alive check")
 
 	clusterID := &grpc_infrastructure_go.ClusterId{
-		OrganizationId:       alive.OrganizationId,
-		ClusterId:            alive.ClusterId,
+		OrganizationId: alive.OrganizationId,
+		ClusterId:      alive.ClusterId,
 	}
 	getCtx, getCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer getCancel()
 	previous, err := m.ClustersClient.GetCluster(getCtx, clusterID)
-	if err != nil{
+	if err != nil {
 		log.Error().Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to get cluster")
 		return conversions.ToDerror(err)
 	}
 
 	updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest{
-		OrganizationId:       alive.OrganizationId,
-		ClusterId:            alive.ClusterId,
-		UpdateLastClusterTimestamp : true,
-		LastClusterTimestamp: alive.Timestamp,
+		OrganizationId:             alive.OrganizationId,
+		ClusterId:                  alive.ClusterId,
+		UpdateLastClusterTimestamp: true,
+		LastClusterTimestamp:       alive.Timestamp,
 	}
 
 	var nextStatus grpc_connectivity_manager_go.ClusterStatus
@@ -89,7 +100,7 @@ func (m * Manager) ClusterAlive (alive *grpc_connectivity_manager_go.ClusterAliv
 	updateCtx, updateCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer updateCancel()
 	_, err = m.ClustersClient.UpdateCluster(updateCtx, updateClusterRequest)
-	if err != nil{
+	if err != nil {
 		log.Error().Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to update cluster")
 		return conversions.ToDerror(err)
 	}
@@ -102,22 +113,22 @@ func (m *Manager) TransitionClustersToOffline() {
 	orgCtx, orgCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer orgCancel()
 	organizations, err := m.OrganizationsClient.ListOrganizations(orgCtx, &grpc_common_go.Empty{})
-	if err != nil{
+	if err != nil {
 		log.Error().Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to get the list of organization, skipping transitioning clusters to offline")
 		return
 	}
-	for _, org := range organizations.Organizations{
+	for _, org := range organizations.Organizations {
 		log.Debug().Str("organizationID", org.OrganizationId).Msg("checking organization clusters")
 		organizationID := &grpc_organization_go.OrganizationId{
-			OrganizationId:       org.OrganizationId,
+			OrganizationId: org.OrganizationId,
 		}
 		clusterCtx, clusterCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 		defer clusterCancel()
 		clusters, err := m.ClustersClient.ListClusters(clusterCtx, organizationID)
-		if err != nil{
+		if err != nil {
 			log.Error().Str("organizationID", org.OrganizationId).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to get the list of organization clusters, skipping transitioning clusters to offline in that organization")
-		}else{
-			for _, cluster := range clusters.Clusters{
+		} else {
+			for _, cluster := range clusters.Clusters {
 				m.checkTransitionClusterToOffline(cluster)
 			}
 		}
@@ -125,47 +136,47 @@ func (m *Manager) TransitionClustersToOffline() {
 }
 
 func (m *Manager) checkTransitionClusterToOffline(cluster *grpc_infrastructure_go.Cluster) {
-	if time.Now().Unix() - cluster.LastAliveTimestamp > int64(m.config.Threshold.Seconds()) {
+	if time.Now().Unix()-cluster.LastAliveTimestamp > int64(m.config.Threshold.Seconds()) {
 		var nextStatus grpc_connectivity_manager_go.ClusterStatus
 		send := false
 		if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE {
 			nextStatus = grpc_connectivity_manager_go.ClusterStatus_OFFLINE
 			send = true
-		}else if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE_CORDON {
+		} else if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_ONLINE_CORDON {
 			nextStatus = grpc_connectivity_manager_go.ClusterStatus_OFFLINE_CORDON
 			send = true
 		}
 
 		if send {
-			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
-				OrganizationId:       cluster.OrganizationId,
-				ClusterId:            cluster.ClusterId,
-				UpdateStatus: true,
-				Status: nextStatus,
+			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest{
+				OrganizationId: cluster.OrganizationId,
+				ClusterId:      cluster.ClusterId,
+				UpdateStatus:   true,
+				Status:         nextStatus,
 			}
 			updateCtx, updateCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 			defer updateCancel()
 			_, err := m.ClustersClient.UpdateCluster(updateCtx, updateClusterRequest)
-			if err != nil{
+			if err != nil {
 				log.Error().Interface("update", updateClusterRequest).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to transition cluster to OFFLINE*")
 			}
 		}
 	}
 	if cluster.ClusterStatus == grpc_connectivity_manager_go.ClusterStatus_OFFLINE {
-		if time.Now().Unix() - cluster.LastAliveTimestamp > cluster.GracePeriod {
+		if time.Now().Unix()-cluster.LastAliveTimestamp > cluster.GracePeriod {
 			log.Debug().Msg("transitioning cluster from offline to offline cordon")
-			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest {
-				OrganizationId:       cluster.OrganizationId,
-				ClusterId:            cluster.ClusterId,
-				UpdateStatus: true,
-				Status: grpc_connectivity_manager_go.ClusterStatus_OFFLINE_CORDON,
+			updateClusterRequest := &grpc_infrastructure_go.UpdateClusterRequest{
+				OrganizationId: cluster.OrganizationId,
+				ClusterId:      cluster.ClusterId,
+				UpdateStatus:   true,
+				Status:         grpc_connectivity_manager_go.ClusterStatus_OFFLINE_CORDON,
 			}
 			updateCtx, updateCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 			defer updateCancel()
 			_, err := m.ClustersClient.UpdateCluster(updateCtx, updateClusterRequest)
-			if err != nil{
+			if err != nil {
 				log.Error().Interface("update", updateClusterRequest).Str("trace", conversions.ToDerror(err).DebugReport()).Msg("unable to transition cluster to OFFLINE_CORDON")
-				}
+			}
 			m.triggerOfflinePolicy(cluster)
 		}
 	}
@@ -185,13 +196,13 @@ func (m *Manager) triggerOfflinePolicy(cluster *grpc_infrastructure_go.Cluster) 
 }
 
 // Triggers a drain offline policy and drains the cluster passed as parameter
-func (m *Manager) triggerDrainOfflinePolicy (cluster *grpc_infrastructure_go.Cluster) {
+func (m *Manager) triggerDrainOfflinePolicy(cluster *grpc_infrastructure_go.Cluster) {
 	drainClusterRequest := &grpc_conductor_go.DrainClusterRequest{
 		ClusterId: &grpc_infrastructure_go.ClusterId{
 			OrganizationId: cluster.OrganizationId,
 			ClusterId:      cluster.ClusterId,
 		},
-		ClusterOffline:       true,
+		ClusterOffline: true,
 	}
 	drainCtx, drainCancel := context.WithTimeout(context.Background(), DefaultTimeout)
 	defer drainCancel()
