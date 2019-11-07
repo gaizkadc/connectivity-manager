@@ -8,7 +8,7 @@ When a new platform is installed a `grace-period` is set (120 s by default) and 
 * `threshold`: period after an App Cluster that has lost communication (stopped receiving `ClusterAlive` signals) with the Mngt Cluster will change its status from `ONLINE`/`ONLINE_CORDON`to `OFFLINE`/`OFFLINE_CORDON`.
 * `offlinePolicy`: it defines the policy that will be triggered when a cluster has lost communication with the Mngt Cluster for a `grace-period` amount of time. It can be set to `none` or `drain`:
   * `none`: no policy will be triggered.
-  * `drain`: the App Cluster will be drained (a `drain` signal will be sent to conductor) after the `grace-period` expires and all the applications running onn it will be redeployed somewhere else (when possible.)
+  * `drain`: the App Cluster will be drained (a `drain` signal will be sent to conductor) after the `grace-period` expires and all the applications running on it will be redeployed somewhere else (when possible.)
   
 ### Cluster status lifecycle
 * When an App Cluster is created and no `ClusterAlive signals` are being sent yet, the cluster status will be `UNKNOWN`.
