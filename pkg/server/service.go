@@ -1,8 +1,18 @@
 /*
- * Copyright (C) 2018 Nalej Group - All Rights Reserved
+ * Copyright 2019 Nalej
  *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
 
 package server
 
@@ -25,7 +35,7 @@ import (
 
 const (
 	InfrastructureEventsConsumerName = "ConnectivityManager-infra_events"
-	InfrastructureOpsProducerName = "ConnectivityManager-infra_ops"
+	InfrastructureOpsProducerName    = "ConnectivityManager-infra_ops"
 )
 
 type Service struct {
@@ -38,8 +48,8 @@ type Service struct {
 func NewService(config *config.Config) (*Service, error) {
 	server := grpc.NewServer()
 	instance := Service{
-		server:             server,
-		configuration:      config,
+		server:        server,
+		configuration: config,
 	}
 
 	return &instance, nil
@@ -47,29 +57,29 @@ func NewService(config *config.Config) (*Service, error) {
 
 type Clients struct {
 	ClusterClient grpc_infrastructure_go.ClustersClient
-	OrgClient grpc_organization_go.OrganizationsClient
+	OrgClient     grpc_organization_go.OrganizationsClient
 }
 
 type BusClients struct {
 	InfrastructureEventsConsumer *events.InfrastructureEventsConsumer
-	InfrastructureOpsProducer *infra_ops.InfrastructureOpsProducer
+	InfrastructureOpsProducer    *infra_ops.InfrastructureOpsProducer
 }
 
 // GetClients creates the required connections with the remote clients.
-func (s*Service) GetClients() (*Clients, derrors.Error) {
+func (s *Service) GetClients() (*Clients, derrors.Error) {
 	smConn, err := grpc.Dial(s.configuration.SystemModelAddress, grpc.WithInsecure())
-	if err != nil{
+	if err != nil {
 		return nil, derrors.AsError(err, "cannot create connection with the system model component")
 	}
 
 	clClient := grpc_infrastructure_go.NewClustersClient(smConn)
 	orgClient := grpc_organization_go.NewOrganizationsClient(smConn)
 
-	return &Clients{ClusterClient:clClient, OrgClient:orgClient}, nil
+	return &Clients{ClusterClient: clClient, OrgClient: orgClient}, nil
 }
 
 // GetBusClients creates the required connections with the bus
-func (s*Service) GetBusClients() (*BusClients, derrors.Error) {
+func (s *Service) GetBusClients() (*BusClients, derrors.Error) {
 	queueClient := pulsar_comcast.NewClient(s.configuration.QueueAddress, nil)
 
 	// Infrastructure Events Consumer
@@ -90,12 +100,12 @@ func (s*Service) GetBusClients() (*BusClients, derrors.Error) {
 	}
 
 	return &BusClients{
-		InfrastructureEventsConsumer:infraEventsConsumer,
-		InfrastructureOpsProducer:infraOpsProducer,
+		InfrastructureEventsConsumer: infraEventsConsumer,
+		InfrastructureOpsProducer:    infraOpsProducer,
 	}, nil
 }
 
-func(s *Service) Run() {
+func (s *Service) Run() {
 	vErr := s.configuration.Validate()
 	if vErr != nil {
 		log.Fatal().Str("err", vErr.DebugReport()).Msg("invalid configuration")
@@ -108,12 +118,12 @@ func(s *Service) Run() {
 	}
 
 	clients, cErr := s.GetClients()
-	if cErr != nil{
+	if cErr != nil {
 		log.Fatal().Str("err", cErr.DebugReport()).Msg("Cannot create clients")
 	}
 
 	busClients, bErr := s.GetBusClients()
-	if bErr != nil{
+	if bErr != nil {
 		log.Fatal().Str("err", bErr.DebugReport()).Msg("Cannot create bus clients")
 	}
 
@@ -123,7 +133,7 @@ func(s *Service) Run() {
 		busClients.InfrastructureEventsConsumer,
 		busClients.InfrastructureOpsProducer,
 		*s.configuration)
-	if nmErr != nil{
+	if nmErr != nil {
 		log.Fatal().Str("err", nmErr.Error()).Msg("Cannot create connectivity-manager manager")
 	}
 
