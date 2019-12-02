@@ -8,6 +8,9 @@
   "image_list": [
     "connectivity-manager"
   ],
+  "component_list": [
+    "connectivity-manager"
+  ],
   "tools": [
     "k8s",
     "docker"
