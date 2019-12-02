@@ -52,7 +52,7 @@ stages:
 - stage: 'ComponentDeploy'
   #condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
   #dependsOn: 'ImageBuild'
-  dependsOn:'BinaryBuild'
+  dependsOn: 'BinaryBuild'
   jobs:
   - job: 
     pool:
